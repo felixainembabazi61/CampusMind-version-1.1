@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Peer Stories · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="stories">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / Peer Stories</div>
+        <h1>Peer Stories</h1>
+        <p>Real experiences from MUST students. Every story is reviewed by a moderator before it's published, and you can always share anonymously.</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="filters">
+          <div class="input-icon" style="flex:1;min-width:220px"><span data-icon="search"></span><input class="input" id="q" type="search" placeholder="Search stories…" aria-label="Search stories" style="width:100%"></div>
+          <select class="input" id="tag" aria-label="Filter by topic"><option value="">All topics</option></select>
+          <button class="btn btn-primary" id="share-btn"><span data-icon="edit"></span> Share your story</button>
+        </div>
+        <div id="my-pending"></div>
+        <div class="story-grid" id="stories"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api, esc, icon } = CM;
+      const user = await CM.page({ page: 'stories' });
+      const TAGS = ['Academic stress', 'Anxiety', 'Adjustment', 'Loneliness', 'Grief', 'Relationships', 'Recovery', 'Coping tips', 'Financial stress', 'Self-esteem'];
+      document.getElementById('tag').innerHTML += TAGS.map(t => '<option>' + esc(t) + '</option>').join('');
+
+      function storyCard(s) {
+        const author = s.anonymous ? null : api.user(s.authorId);
+        const long = s.body.length > 260;
+        return '<article class="story" id="' + s.id + '"><div class="meta">' + CM.avatar(author) + '<div><b style="color:var(--ink)">' + esc(api.displayName(s.authorId, s.anonymous)) + '</b><br>' + CM.timeAgo(s.createdAt) + '</div></div>' +
+          '<h3>' + esc(s.title) + '</h3><div class="tags">' + s.tags.map(t => '<span class="badge">' + esc(t) + '</span>').join('') + '</div>' +
+          '<div class="text ' + (long ? 'clamp' : '') + '">' + esc(s.body) + '</div>' +
+          (long ? '<button class="btn btn-ghost btn-sm" data-more style="align-self:flex-start;margin-top:6px;padding-left:0">Read more</button>' : '') +
+          '<div class="reactions">' + CM.reactionsHTML('story', s.id, user) + '</div></article>';
+      }
+
+      function render() {
+        const q = document.getElementById('q').value.trim().toLowerCase();
+        const tag = document.getElementById('tag').value;
+        const list = api.publishedStories().filter(s => (!tag || s.tags.includes(tag)) && (!q || (s.title + ' ' + s.body).toLowerCase().includes(q)));
+        document.getElementById('stories').innerHTML = list.length ? list.map(storyCard).join('') : '<div style="grid-column:1/-1">' + CM.emptyState('book', 'No stories match your search.') + '</div>';
+        if (user) {
+          const mine = CM.db.where('stories', s => s.authorId === user.id && s.status !== 'published');
+          document.getElementById('my-pending').innerHTML = mine.length ? '<div class="alert">' + icon('info') + '<span><b>Your submissions</b>' +
+            mine.map(s => esc(s.title) + ' – ' + CM.statusBadge(s.status) + (s.moderatorNote ? ' <span class="small">(' + esc(s.moderatorNote) + ')</span>' : '')).join('<br>') + '</span></div>' : '';
+        }
+        if (location.hash) { const el = document.querySelector(location.hash.replace(/[^#\w-]/g, '')); if (el) { el.scrollIntoView({ block: 'center' }); el.style.boxShadow = '0 0 0 3px var(--green-600)'; } }
+      }
+
+      document.getElementById('q').addEventListener('input', render);
+      document.getElementById('tag').addEventListener('change', render);
+      document.getElementById('stories').addEventListener('click', e => {
+        const more = e.target.closest('[data-more]');
+        if (more) { const t = more.previousElementSibling; t.classList.toggle('clamp'); more.textContent = t.classList.contains('clamp') ? 'Read more' : 'Show less'; }
+      });
+      CM.bindSocial(document.getElementById('stories'), user, render);
+
+      document.getElementById('share-btn').addEventListener('click', () => {
+        if (!user) { location.href = 'login.html?next=stories.html'; return; }
+        CM.modal({
+          title: 'Share your story',
+          wide: true,
+          body: '<form novalidate><div class="alert">' + icon('shield') + '<span>Please don\'t include names or details that could identify other people. A moderator reviews every story before it goes live.</span></div>' +
+            '<div class="field" data-field="title"><label for="st-t">Title</label><input class="input" id="st-t" name="title" maxlength="120"><div class="err"></div></div>' +
+            '<div class="field" data-field="body"><label for="st-b">Your story</label><textarea class="input" id="st-b" name="body" rows="8" maxlength="4000"></textarea><div class="err"></div></div>' +
+            '<div class="field"><span class="label">Topics (up to 4)</span><div class="choice-grid">' + TAGS.map(t => '<label class="choice"><input type="checkbox" name="tags" value="' + esc(t) + '"><span>' + esc(t) + '</span></label>').join('') + '</div></div>' +
+            '<label class="check" style="margin-bottom:12px"><input type="checkbox" name="anonymous" checked> Publish anonymously</label>' +
+            '<div class="form-actions"><button type="button" class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary">Submit for review</button></div></form>',
+          onMount(m, close) {
+            const form = m.querySelector('form');
+            form.addEventListener('change', e => {
+              if (e.target.name === 'tags' && form.querySelectorAll('[name=tags]:checked').length > 4) { e.target.checked = false; CM.toast('Choose up to 4 topics.', 'error'); }
+            });
+            CM.onSubmit(form, async () => {
+              try {
+                const s = await api.submitStory(user, CM.formData(form));
+                close();
+                CM.toast(s.status === 'published' ? 'Story published.' : 'Thank you for sharing! Your story will appear once a moderator approves it.');
+                render();
+              } catch (err) { CM.showErrors(form, err); }
+            });
+          }
+        });
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

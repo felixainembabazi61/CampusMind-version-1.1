@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Dashboard · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="admin">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / Admin Dashboard</div>
+        <h1>Wellbeing Overview</h1>
+        <p>Monitor service performance, manage users and counselor schedules, and control system operations.</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="kpis" id="kpis"></div>
+
+        <div class="card" id="admin">
+          <div class="tabs">
+            <button data-tab="overview">Overview</button>
+            <button data-tab="users">Users &amp; roles</button>
+            <button data-tab="sessions">Sessions</button>
+            <button data-tab="schedules">Counselor schedules</button>
+            <button data-tab="forum">Forum categories</button>
+            <button data-tab="contact">Contact details</button>
+            <button data-tab="messages">Inbox <span class="badge" id="c-inbox"></span></button>
+            <button data-tab="system">System</button>
+          </div>
+
+          <div class="tab-panel" id="tab-overview">
+            <div class="grid-2">
+              <div><h4>Sessions per day (last 14 days &amp; next 7)</h4><div id="chart-days"></div></div>
+              <div><h4>Most common intake concerns</h4><div id="chart-concerns"></div></div>
+              <div><h4>Session outcomes</h4><div id="chart-status"></div></div>
+              <div><h4>Counselor utilisation (upcoming slots booked)</h4><div id="chart-util"></div></div>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tab-users">
+            <div class="filters">
+              <div class="input-icon" style="flex:1;min-width:200px"><span data-icon="search"></span><input class="input" id="u-q" type="search" placeholder="Search by name or email…" aria-label="Search users" style="width:100%"></div>
+              <select class="input" id="u-role" aria-label="Filter by role"><option value="">All roles</option><option>student</option><option>counselor</option><option>moderator</option><option>admin</option></select>
+              <button class="btn btn-primary" id="add-staff"><span data-icon="plus"></span> Add staff account</button>
+            </div>
+            <div class="table-wrap"><table class="table" id="users"></table></div>
+          </div>
+
+          <div class="tab-panel" id="tab-sessions">
+            <div class="filters">
+              <select class="input" id="b-status" aria-label="Filter by status"><option value="">All statuses</option><option>confirmed</option><option>completed</option><option>cancelled</option><option>no-show</option></select>
+              <select class="input" id="b-counselor" aria-label="Filter by counselor"><option value="">All counselors</option></select>
+              <span class="muted small" id="b-count"></span>
+            </div>
+            <div class="table-wrap"><table class="table" id="bookings"></table></div>
+          </div>
+
+          <div class="tab-panel" id="tab-schedules"><div class="grid-3" id="schedules"></div></div>
+
+          <div class="tab-panel" id="tab-forum">
+            <form id="cat-form" class="filters" novalidate style="align-items:flex-end">
+              <div style="flex:1;min-width:180px"><label class="label" for="c-n">Name</label><input class="input" id="c-n" name="name" style="width:100%"></div>
+              <div style="flex:2;min-width:220px"><label class="label" for="c-d">Description</label><input class="input" id="c-d" name="description" style="width:100%"></div>
+              <div><label class="label" for="c-c">Colour</label><input class="input" type="color" id="c-c" name="color" value="#2f7a5c" style="width:60px;padding:4px;height:44px"></div>
+              <button class="btn btn-primary">Add category</button>
+            </form>
+            <div class="table-wrap" style="margin-top:12px"><table class="table" id="cats"></table></div>
+          </div>
+
+          <div class="tab-panel" id="tab-contact">
+            <p class="muted">These details appear in the top bar, footer and crisis banner on every page.</p>
+            <form id="settings-form" novalidate>
+              <div class="grid-2" style="gap:0 18px">
+                <div class="field" data-field="phone"><label for="st-phone">Phone number</label><input class="input" id="st-phone" name="phone"><div class="err"></div></div>
+                <div class="field" data-field="email"><label for="st-email">Email address</label><input class="input" id="st-email" name="email" type="email"><div class="err"></div></div>
+                <div class="field" data-field="address"><label for="st-address">Full address (footer)</label><textarea class="input" id="st-address" name="address" rows="3" style="min-height:0"></textarea><div class="err"></div></div>
+                <div>
+                  <div class="field" data-field="addressShort"><label for="st-short">Short address (top bar)</label><input class="input" id="st-short" name="addressShort"><div class="err"></div></div>
+                  <div class="field" data-field="emergency"><label for="st-em">Emergency numbers</label><input class="input" id="st-em" name="emergency" placeholder="112, 999"><div class="hint">Separate numbers with commas.</div><div class="err"></div></div>
+                </div>
+                <div class="field" data-field="hoursWeekdays"><label for="st-hw">Weekday opening hours</label><input class="input" id="st-hw" name="hoursWeekdays"><div class="err"></div></div>
+                <div class="field" data-field="hoursSaturday"><label for="st-hs">Weekend opening hours</label><input class="input" id="st-hs" name="hoursSaturday"><div class="err"></div></div>
+                <div class="field" data-field="topbarMessage" style="grid-column:1/-1"><label for="st-tb">Top bar message</label><input class="input" id="st-tb" name="topbarMessage"><div class="err"></div></div>
+              </div>
+              <div class="form-actions"><button class="btn btn-primary">Save contact details</button></div>
+            </form>
+          </div>
+
+          <div class="tab-panel" id="tab-messages"><div id="inbox"></div></div>
+
+          <div class="tab-panel" id="tab-system">
+            <div class="grid-3">
+              <div class="card" style="box-shadow:none;border:1px solid var(--line)"><h4>Export data</h4><p class="small muted">Download all records as JSON for backup or reporting (password hashes are removed).</p><button class="btn btn-outline btn-sm" id="export"><span data-icon="download"></span> Export JSON</button></div>
+              <div class="card dev-only" style="box-shadow:none;border:1px solid var(--line);margin-top:0"><h4>System tests</h4><p class="small muted">Run the automated validation suite: page load, login redirect, booking and storage checks.</p><a class="btn btn-outline btn-sm" href="tests.html"><span data-icon="check-circle"></span> Open test runner</a></div>
+              <div class="card dev-only" style="box-shadow:none;border:1px solid var(--danger);margin-top:0"><h4>Reset demo data</h4><p class="small muted">Restore the original sample users, slots, stories and posts. This deletes everything created since.</p><button class="btn btn-danger btn-sm" id="reset"><span data-icon="refresh"></span> Reset data</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api, esc, icon } = CM;
+      const me = await CM.page({ page: 'admin', roles: ['admin'] });
+      if (!me) return;
+
+      function renderKpis() {
+        const s = api.stats();
+        document.getElementById('kpis').innerHTML = [
+          ['users', s.students, 'Registered students'], ['calendar', s.upcoming, 'Upcoming sessions'],
+          ['chart', s.utilization + '%', 'Slot utilisation'], ['check-circle', s.completed, 'Sessions completed'],
+          ['clipboard', s.newIntakes, 'New intakes'], ['alert', s.urgentOpen, 'Urgent intakes open', s.urgentOpen],
+          ['flag', s.openReports, 'Open reports', s.openReports], ['book', s.pendingStories, 'Stories pending']
+        ].map(([i, v, l, a]) => '<div class="kpi ' + (a ? 'kpi-alert' : '') + '"><span class="ic">' + icon(i) + '</span><div><b>' + v + '</b><span>' + l + '</span></div></div>').join('');
+      }
+
+      function renderOverview() {
+        const days = [];
+        for (let d = -13; d <= 7; d++) days.push(CM.addDays(d));
+        const bookings = CM.db.all('bookings').map(b => Object.assign({}, b, { slot: CM.db.find('slots', b.slotId) || {} })).filter(b => b.status !== 'cancelled');
+        document.getElementById('chart-days').innerHTML = CM.barChart(days.map(d => ({ label: CM.fmtDate(d), short: CM.parseDate(d).getDate(), value: bookings.filter(b => b.slot.date === d).length })));
+        const counts = {};
+        CM.db.all('intakes').forEach(i => i.concerns.forEach(c => { counts[c] = (counts[c] || 0) + 1; }));
+        const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        document.getElementById('chart-concerns').innerHTML = top.length ? CM.hbars(top.map(([label, value]) => ({ label, value }))) : '<p class="muted">No intakes yet.</p>';
+        const s = api.stats();
+        document.getElementById('chart-status').innerHTML = CM.hbars([
+          { label: 'Confirmed (upcoming)', value: s.upcoming }, { label: 'Completed', value: s.completed, color: '#2b5c9e' },
+          { label: 'No-show', value: s.noShow, color: '#b7791f' }, { label: 'Cancelled', value: s.cancelled, color: '#8a948f' }]);
+        const today = CM.addDays(0);
+        document.getElementById('chart-util').innerHTML = CM.hbars(api.counselors().map(c => {
+          const sl = CM.db.where('slots', x => x.counselorId === c.id && x.date >= today && x.status !== 'cancelled');
+          return { label: c.name + ' (' + sl.filter(x => x.status === 'booked').length + '/' + sl.length + ')', value: sl.length ? Math.round(sl.filter(x => x.status === 'booked').length / sl.length * 100) : 0 };
+        }));
+      }
+
+      function renderUsers() {
+        const q = document.getElementById('u-q').value.trim().toLowerCase();
+        const role = document.getElementById('u-role').value;
+        const users = CM.db.all('users').filter(u => (!role || u.role === role) && (!q || (u.name + ' ' + u.email).toLowerCase().includes(q))).sort((a, b) => a.role.localeCompare(b.role) || a.name.localeCompare(b.name));
+        document.getElementById('users').innerHTML = '<thead><tr><th>User</th><th>Role</th><th>Details</th><th>Last login</th><th>Status</th><th></th></tr></thead><tbody>' + users.map(u =>
+          '<tr><td><div class="person">' + CM.avatar(u) + '<div><b>' + esc(u.name) + '</b><div class="small muted">' + esc(u.email) + '</div></div></div></td>' +
+          '<td>' + (u.id === me.id ? '<span class="badge">admin (you)</span>' : '<select class="input" data-role="' + u.id + '" style="padding:6px 8px;width:auto" aria-label="Role for ' + esc(u.name) + '">' + api.ROLES.map(r => '<option ' + (r === u.role ? 'selected' : '') + '>' + r + '</option>').join('') + '</select>') + '</td>' +
+          '<td class="small">' + esc(u.studentNo || u.title || '') + '<div class="muted">' + esc(u.faculty || (u.specialties || []).join(', ')) + '</div></td>' +
+          '<td class="small muted">' + (u.lastLogin ? CM.timeAgo(u.lastLogin) : 'Never') + '</td>' +
+          '<td>' + (u.active ? '<span class="badge">active</span>' : '<span class="badge grey">deactivated</span>') + '</td>' +
+          '<td><div class="actions">' + (u.id !== me.id ? '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-outline') + '" data-active="' + u.id + '">' + (u.active ? 'Deactivate' : 'Reactivate') + '</button>' : '') + '</div></td></tr>').join('') + '</tbody>';
+      }
+
+      function renderBookings() {
+        const st = document.getElementById('b-status').value, c = document.getElementById('b-counselor').value;
+        const rows = api.bookingsFor(me).filter(b => (!st || b.status === st) && (!c || b.counselorId === c)).reverse();
+        document.getElementById('b-count').textContent = rows.length + ' session' + (rows.length === 1 ? '' : 's');
+        document.getElementById('bookings').innerHTML = '<thead><tr><th>When</th><th>Student</th><th>Counselor</th><th>Mode</th><th>Status</th><th>Booked</th><th></th></tr></thead><tbody>' + rows.map(b =>
+          '<tr><td><b>' + (b.slot.date ? CM.fmtDate(b.slot.date) : '—') + '</b><div class="small muted">' + (b.slot.start || '') + '</div></td><td>' + esc(api.displayName(b.studentId)) + '</td><td>' + esc(api.displayName(b.counselorId)) + '</td><td>' + esc(b.slot.mode || '') + '</td><td>' + CM.statusBadge(b.status) + '</td><td class="small muted">' + CM.timeAgo(b.createdAt) + '</td>' +
+          '<td><div class="actions">' + (b.status === 'confirmed' && CM.slotStart(b.slot) > new Date() ? '<button class="btn btn-danger btn-sm" data-cancel="' + b.id + '">Cancel</button>' : '') + '</div></td></tr>').join('') + '</tbody>';
+      }
+
+      function renderSchedules() {
+        const today = CM.addDays(0);
+        document.getElementById('schedules').innerHTML = CM.db.where('users', u => u.role === 'counselor').map(c => {
+          const sl = CM.db.where('slots', x => x.counselorId === c.id && x.date >= today);
+          return '<div class="card" style="box-shadow:none;border:1px solid var(--line);margin-top:0"><div class="person" style="margin-bottom:12px">' + CM.avatar(c, 'lg') + '<div><b>' + esc(c.name) + '</b><div class="small muted">' + esc(c.title || '') + '</div>' + (c.active ? '' : '<span class="badge grey">deactivated</span>') + '</div></div>' +
+            '<div class="meta-line" style="margin-bottom:12px"><span><b>' + sl.filter(x => x.status === 'open').length + '</b> open</span><span><b>' + sl.filter(x => x.status === 'booked').length + '</b> booked</span></div>' +
+            '<a class="btn btn-outline btn-sm" href="counselor.html?as=' + c.id + '#slots">Manage schedule</a></div>';
+        }).join('');
+      }
+
+      function renderCats() {
+        document.getElementById('cats').innerHTML = '<thead><tr><th>Category</th><th>Description</th><th>Discussions</th></tr></thead><tbody>' + api.categories().map(c =>
+          '<tr><td><span class="cat-dot" style="background:' + esc(c.color) + '"></span><b>' + esc(c.name) + '</b></td><td class="muted">' + esc(c.description) + '</td><td>' + api.visiblePosts(c.id).length + '</td></tr>').join('') + '</tbody>';
+      }
+
+      function renderInbox() {
+        const msgs = CM.db.all('contactMessages');
+        document.getElementById('c-inbox').textContent = msgs.length || '';
+        document.getElementById('inbox').innerHTML = msgs.length ? msgs.map(m =>
+          '<div class="session-item"><span class="avatar">' + esc(CM.initials(m.name)) + '</span><div class="info"><b>' + esc(m.name) + ' · <a href="mailto:' + esc(m.email) + '">' + esc(m.email) + '</a></b>' +
+          '<span>' + CM.fmtDateTime(m.createdAt) + '</span><p style="margin:6px 0 0;white-space:pre-line">' + esc(m.message) + '</p></div></div>').join('')
+          : CM.emptyState('inbox', 'No messages from the contact form yet.');
+      }
+
+      function renderAll() { renderKpis(); renderOverview(); renderUsers(); renderBookings(); renderSchedules(); renderCats(); renderInbox(); }
+
+      document.getElementById('b-counselor').innerHTML += CM.db.where('users', u => u.role === 'counselor').map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
+      CM.tabs(document.getElementById('admin'));
+      ['u-q', 'u-role'].forEach(id => document.getElementById(id).addEventListener('input', renderUsers));
+      ['b-status', 'b-counselor'].forEach(id => document.getElementById(id).addEventListener('change', renderBookings));
+
+      document.getElementById('admin').addEventListener('change', async e => {
+        const sel = e.target.closest('[data-role]'); if (!sel) return;
+        try { await api.setUserRole(me, sel.dataset.role, sel.value); CM.toast('Role updated.'); renderAll(); } catch (err) { CM.toast(err.message, 'error'); renderUsers(); }
+      });
+      document.getElementById('admin').addEventListener('click', async e => {
+        const a = e.target.closest('[data-active]');
+        if (a) {
+          const u = CM.db.find('users', a.dataset.active);
+          if (u.active && !(await CM.confirm('Deactivate ' + u.name + '? They will be signed out and unable to log in.', 'Deactivate', true))) return;
+          try { await api.setUserActive(me, u.id, !u.active); CM.toast('Account ' + (u.active ? 'reactivated' : 'deactivated') + '.'); renderAll(); } catch (err) { CM.toast(err.message, 'error'); }
+        }
+        const c = e.target.closest('[data-cancel]');
+        if (c) {
+          if (!(await CM.confirm('Cancel this session on behalf of the counseling centre? Both parties will be notified.', 'Cancel session', true))) return;
+          try { await api.cancelBooking(me, c.dataset.cancel); CM.toast('Session cancelled.'); renderAll(); }
+          catch (err) { CM.toast(err.message, 'error'); }
+        }
+      });
+
+      document.getElementById('add-staff').addEventListener('click', () => {
+        CM.modal({
+          title: 'Add staff account', wide: true,
+          body: '<form novalidate><div class="grid-2" style="gap:12px">' +
+            '<div class="field" data-field="name"><label for="sf-n">Full name</label><input class="input" id="sf-n" name="name"><div class="err"></div></div>' +
+            '<div class="field" data-field="email"><label for="sf-e">Email</label><input class="input" id="sf-e" name="email" type="email"><div class="err"></div></div>' +
+            '<div class="field" data-field="role"><label for="sf-r">Role</label><select class="input" id="sf-r" name="role"><option>counselor</option><option>moderator</option><option>admin</option></select><div class="err"></div></div>' +
+            '<div class="field" data-field="password"><label for="sf-p">Temporary password</label><input class="input" id="sf-p" name="password" type="text" autocomplete="off"><div class="err"></div></div>' +
+            '<div class="field"><label for="sf-t">Job title</label><input class="input" id="sf-t" name="title" placeholder="e.g. Counseling Psychologist"></div>' +
+            '<div class="field"><label for="sf-s">Specialties (comma separated)</label><input class="input" id="sf-s" name="specialties" placeholder="Anxiety, Grief"></div></div>' +
+            '<div class="form-actions"><button type="button" class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary">Create account</button></div></form>',
+          onMount(m, close) {
+            const form = m.querySelector('form');
+            CM.onSubmit(form, async () => {
+              try { const u = await api.createStaff(me, CM.formData(form)); close(); CM.toast(u.name + ' added as ' + u.role + '.'); renderAll(); }
+              catch (err) { CM.showErrors(form, err); }
+            });
+          }
+        });
+      });
+
+      CM.onSubmit(document.getElementById('cat-form'), async form => {
+        try { await api.addCategory(me, CM.formData(form)); form.reset(); CM.toast('Category added.'); renderCats(); }
+        catch (err) { CM.toast(err.message, 'error'); }
+      });
+
+      document.getElementById('export').addEventListener('click', async () => {
+        try {
+          const data = await api.exportData();
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'campusmind-export-' + CM.addDays(0) + '.json';
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        } catch (err) { CM.toast(err.message, 'error'); }
+      });
+      document.getElementById('reset').addEventListener('click', async () => {
+        if (!(await CM.confirm('Reset all data to the original demo state? Everything created since will be lost.', 'Reset everything', true))) return;
+        try { await api.resetData(); location.href = 'login.html'; } catch (err) { CM.toast(err.message, 'error'); }
+      });
+
+      // testing and reset tools only exist on the local copy
+      if (CM.db.app.live) document.querySelectorAll('.dev-only').forEach(el => el.remove());
+
+      const settingsForm = document.getElementById('settings-form');
+      Array.from(settingsForm.elements).forEach(el => { if (el.name) el.value = CM.db.settings[el.name] || ''; });
+      CM.onSubmit(settingsForm, async form => {
+        CM.clearErrors(form);
+        try {
+          await api.updateSettings(me, CM.formData(form));
+          CM.renderChrome();
+          CM.toast('Contact details saved. They now show on every page.');
+        } catch (err) { CM.showErrors(form, err); }
+      });
+
+      renderAll();
+    })();
+  </script>
+</body>
+</html>

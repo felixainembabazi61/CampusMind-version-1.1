@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Discussion · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="thread">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / <a href="forum.html">Forum</a> / <span id="crumb-cat"></span></div>
+        <h1 id="title">Discussion</h1>
+        <div class="meta-line" id="meta" style="color:#a9c2b5"></div>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap layout-main-side">
+        <div>
+          <article class="card" id="post"></article>
+          <div class="card">
+            <h3 id="reply-count">Replies</h3>
+            <div id="comments"></div>
+          </div>
+          <div class="card" id="reply-box"></div>
+        </div>
+        <aside>
+          <div class="card" id="mod-tools"></div>
+          <div class="card">
+            <h3>Need to talk privately?</h3>
+            <p class="small muted">The forum is public to students. For anything personal, a counselor can help one-on-one.</p>
+            <a class="btn btn-primary btn-block" href="book.html">Book a session</a>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api, esc, icon } = CM;
+      const user = await CM.page({ page: 'thread' });
+      let post = CM.db.find('forumPosts', CM.qs('id'));
+      const isMod = user && ['moderator', 'admin'].includes(user.role);
+      if (!post || (post.status !== 'visible' && !isMod)) {
+        document.getElementById('main').innerHTML = '<div class="wrap"><div class="denied">' + icon('forum') + '<h2>Discussion not found</h2><p class="muted">It may have been removed by a moderator.</p><a class="btn btn-primary" href="forum.html">Back to forum</a></div></div>';
+        return;
+      }
+
+      function authorLine(row) {
+        const u = row.anonymous ? null : api.user(row.authorId);
+        const staff = u && u.role !== 'student';
+        return CM.avatar(u) + '<div><b>' + esc(api.displayName(row.authorId, row.anonymous)) + '</b> ' + (staff ? '<span class="badge staff-tag">' + esc(u.role) + '</span>' : '') + '<div class="small muted">' + CM.timeAgo(row.createdAt) + '</div></div>';
+      }
+
+      function render() {
+        post = CM.db.find('forumPosts', post.id) || post; // the snapshot is replaced after every save
+        const cat = CM.db.find('forumCategories', post.categoryId) || {};
+        document.title = post.title + ' · CampusMind';
+        document.getElementById('title').textContent = post.title;
+        document.getElementById('crumb-cat').textContent = cat.name || '';
+        document.getElementById('meta').innerHTML = (post.pinned ? '<span class="badge warn">pinned</span>' : '') + (post.locked ? '<span class="badge grey">locked</span>' : '') + (post.status !== 'visible' ? '<span class="badge danger">hidden</span>' : '');
+
+        const own = user && post.authorId === user.id;
+        document.getElementById('post').innerHTML = '<div class="person" style="margin-bottom:14px">' + authorLine(post) + '</div>' +
+          '<div style="white-space:pre-line">' + esc(post.body) + '</div>' +
+          '<div class="reactions" style="margin-top:18px">' + CM.reactionsHTML('post', post.id, user, !own) + (own ? '<button class="react report" data-remove-post>' + icon('trash') + ' Delete</button>' : '') + '</div>';
+
+        const comments = api.commentsFor(post.id);
+        document.getElementById('reply-count').textContent = comments.length + ' ' + (comments.length === 1 ? 'Reply' : 'Replies');
+        document.getElementById('comments').innerHTML = comments.length ? comments.map(c =>
+          '<div class="comment">' + CM.avatar(c.anonymous ? null : api.user(c.authorId)) + '<div class="bubble"><div class="meta-line"><b style="color:var(--ink)">' + esc(api.displayName(c.authorId, c.anonymous)) + '</b>' +
+          (!c.anonymous && api.user(c.authorId) && api.user(c.authorId).role !== 'student' ? '<span class="badge staff-tag">' + esc(api.user(c.authorId).role) + '</span>' : '') + '<span>' + CM.timeAgo(c.createdAt) + '</span></div>' +
+          '<p>' + esc(c.body) + '</p><div style="display:flex;gap:6px">' +
+          (user && (c.authorId === user.id || isMod) ? '<button class="react" data-remove-comment="' + c.id + '">' + icon('trash').replace('<svg ', '<svg style="width:13px;height:13px" ') + ' Remove</button>' : '<button class="react" data-report="comment" data-id="' + c.id + '">' + icon('flag').replace('<svg ', '<svg style="width:13px;height:13px" ') + ' Report</button>') +
+          '</div></div></div>').join('') : '<p class="muted">No replies yet. Be the first to offer some support.</p>';
+
+        const box = document.getElementById('reply-box');
+        if (!user) box.innerHTML = '<p style="margin:0"><a href="login.html?next=' + encodeURIComponent('thread.html?id=' + post.id) + '"><b>Log in</b></a> to join the conversation.</p>';
+        else if (post.locked && !isMod) box.innerHTML = '<p class="muted" style="margin:0">' + icon('lock').replace('<svg ', '<svg style="width:16px;height:16px;vertical-align:-3px" ') + ' This discussion is locked for new replies.</p>';
+        else box.innerHTML = '<form id="reply-form" novalidate><div class="field" data-field="body"><label for="r-b">Your reply</label><textarea class="input" id="r-b" name="body" rows="4" maxlength="2000" placeholder="Be kind and supportive."></textarea><div class="err"></div></div>' +
+          '<div class="form-actions" style="justify-content:space-between;align-items:center">' + (user.role === 'student' ? '<label class="check"><input type="checkbox" name="anonymous"> Reply anonymously</label>' : '<span></span>') + '<button class="btn btn-primary">' + icon('send') + ' Post reply</button></div></form>';
+
+        const tools = document.getElementById('mod-tools');
+        if (isMod) {
+          tools.innerHTML = '<h3>Moderator tools</h3><div style="display:grid;gap:8px">' +
+            '<button class="btn btn-outline btn-sm" data-flag="pinned">' + icon('pin') + (post.pinned ? 'Unpin' : 'Pin') + ' discussion</button>' +
+            '<button class="btn btn-outline btn-sm" data-flag="locked">' + icon('lock') + (post.locked ? 'Unlock' : 'Lock') + ' replies</button>' +
+            '<button class="btn btn-danger btn-sm" data-flag="status">' + icon('eye-off') + (post.status === 'visible' ? 'Hide' : 'Restore') + ' discussion</button></div>';
+        } else tools.remove();
+      }
+
+      document.getElementById('main').addEventListener('submit', async e => {
+        if (e.target.id !== 'reply-form') return;
+        e.preventDefault();
+        const d = CM.formData(e.target);
+        const btn = e.target.querySelector('button'); btn.disabled = true;
+        try { await api.addComment(user, post.id, d.body, d.anonymous); CM.toast('Reply posted.'); render(); }
+        catch (err) { CM.showErrors(e.target, err.fields ? err : { message: err.message, fields: { body: err.message } }); }
+        finally { btn.disabled = false; }
+      });
+      document.getElementById('main').addEventListener('click', async e => {
+        const f = e.target.closest('[data-flag]');
+        if (f) {
+          const k = f.dataset.flag;
+          const patch = k === 'status' ? { status: post.status === 'visible' ? 'hidden' : 'visible' } : { [k]: !post[k] };
+          try { await api.setPostFlags(user, post.id, patch); } catch (err) { CM.toast(err.message, 'error'); return; }
+          CM.toast('Discussion updated.'); render(); return;
+        }
+        const rc = e.target.closest('[data-remove-comment]');
+        if (rc && await CM.confirm('Remove this reply?', 'Remove', true)) { await api.deleteOwn(user, 'comment', rc.dataset.removeComment); render(); return; }
+        if (e.target.closest('[data-remove-post]') && await CM.confirm('Delete your discussion? Replies will be hidden too.', 'Delete', true)) {
+          await api.deleteOwn(user, 'post', post.id); location.href = 'forum.html';
+        }
+      });
+      CM.bindSocial(document.getElementById('main'), user, render);
+      render();
+    })();
+  </script>
+</body>
+</html>

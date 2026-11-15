@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create Account · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="register">
+  <div id="app-header"></div>
+
+  <main id="main" class="auth">
+    <div class="auth-side" style="background-image:url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1200&q=70&auto=format&fit=crop')">
+      <div>
+        <span class="eyebrow" style="color:#9fd3b8">Join CampusMind</span>
+        <h2>Support that fits around your studies.</h2>
+        <ul class="list-check" style="margin-top:16px">
+          <li><span data-icon="check-circle"></span> Book free counseling sessions in seconds</li>
+          <li><span data-icon="check-circle"></span> Confidential intake reviewed by a counselor</li>
+          <li><span data-icon="check-circle"></span> Share stories and join the forum, anonymously if you prefer</li>
+        </ul>
+      </div>
+    </div>
+    <div class="auth-main">
+      <div class="auth-box">
+        <h1 style="font-size:2.2rem">Create your account</h1>
+        <p class="muted">Student accounts only. Counselor and staff accounts are created by the administrator.</p>
+        <form id="reg-form" novalidate>
+          <div class="field" data-field="name"><label for="name">Full name</label><input class="input" id="name" name="name" autocomplete="name"><div class="err"></div></div>
+          <div class="grid-2" style="gap:12px">
+            <div class="field" data-field="studentNo"><label for="studentNo">Registration number</label><input class="input" id="studentNo" name="studentNo" placeholder="2024/BSE/000/PS"><div class="err"></div></div>
+            <div class="field"><label for="faculty">Faculty</label>
+              <select class="input" id="faculty" name="faculty">
+                <option>Computing &amp; Informatics</option><option>Medicine</option><option>Science</option><option>Business &amp; Management Sciences</option><option>Applied Science &amp; Technology</option><option>Interdisciplinary Studies</option>
+              </select></div>
+          </div>
+          <div class="field" data-field="email"><label for="email">Email address</label><input class="input" id="email" name="email" type="email" autocomplete="email"><div class="err"></div></div>
+          <div class="grid-2" style="gap:12px">
+            <div class="field" data-field="password"><label for="password">Password</label><input class="input" id="password" name="password" type="password" autocomplete="new-password"><div class="err"></div></div>
+            <div class="field" data-field="confirm"><label for="confirm">Confirm password</label><input class="input" id="confirm" name="confirm" type="password" autocomplete="new-password"><div class="err"></div></div>
+          </div>
+          <p class="hint small muted" style="margin-top:-8px">At least 8 characters, including letters and numbers.</p>
+          <div class="field" data-field="terms">
+            <label class="check"><input type="checkbox" name="terms"> I understand that CampusMind keeps my information confidential, except where there is a serious risk to my safety or someone else's.</label>
+            <div class="err"></div>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Create account</button>
+        </form>
+        <p class="center small" style="margin-top:18px">Already have an account? <a href="login.html"><b>Log in</b></a></p>
+      </div>
+    </div>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api } = CM;
+      const next = CM.safeNext(CM.qs('next'));
+      const current = await CM.page({ page: 'register' });
+      if (current) { location.replace(api.homeFor(current)); return; }
+      const form = document.getElementById('reg-form');
+      CM.onSubmit(form, async () => {
+        try {
+          await api.register(CM.formData(form));
+          location.href = next || 'dashboard.html?welcome=1';
+        } catch (err) {
+          CM.showErrors(form, err);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Confidential Intake · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="intake">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / Confidential Intake</div>
+        <h1>Confidential Intake Form</h1>
+        <p>Tell us what's going on so a counselor can understand your needs before you meet. Only counseling staff can read your answers.</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap layout-main-side">
+        <div>
+          <div id="result"></div>
+          <form class="card" id="intake-form" novalidate>
+            <div class="form-section">
+              <h3><span class="n">1</span> What would you like support with?</h3>
+              <div class="field" data-field="concerns">
+                <div class="choice-grid" id="concerns"></div>
+                <div class="err"></div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3><span class="n">2</span> Tell us more</h3>
+              <div class="field" data-field="description">
+                <label for="description">In your own words, what has been happening?</label>
+                <textarea class="input" id="description" name="description" rows="5" maxlength="2000" placeholder="Share as much or as little as you're comfortable with."></textarea>
+                <div class="hint"><span id="desc-count">0</span>/2000 characters · minimum 20</div>
+                <div class="err"></div>
+              </div>
+              <div class="field">
+                <label for="duration">How long have you felt this way?</label>
+                <select class="input" id="duration" name="duration">
+                  <option>Less than a month</option><option>1-3 months</option><option>3-6 months</option><option>More than 6 months</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3><span class="n">3</span> How are you feeling today?</h3>
+              <div class="field" data-field="mood">
+                <div class="mood-scale">
+                  <label class="choice"><input type="radio" name="mood" value="1"><span><span class="face">😞</span>Very low</span></label>
+                  <label class="choice"><input type="radio" name="mood" value="2"><span><span class="face">🙁</span>Low</span></label>
+                  <label class="choice"><input type="radio" name="mood" value="3"><span><span class="face">😐</span>Okay</span></label>
+                  <label class="choice"><input type="radio" name="mood" value="4"><span><span class="face">🙂</span>Good</span></label>
+                  <label class="choice"><input type="radio" name="mood" value="5"><span><span class="face">😊</span>Great</span></label>
+                </div>
+                <div class="err"></div>
+              </div>
+              <div class="field">
+                <span class="label">Have you had thoughts of harming yourself or ending your life recently?</span>
+                <div class="choice-grid" style="grid-template-columns:repeat(3,1fr)">
+                  <label class="choice"><input type="radio" name="safetyRisk" value="no" checked><span>No</span></label>
+                  <label class="choice"><input type="radio" name="safetyRisk" value="yes"><span>Yes</span></label>
+                  <label class="choice"><input type="radio" name="safetyRisk" value="unsure"><span>Prefer not to say</span></label>
+                </div>
+              </div>
+              <div class="alert danger hide" id="risk-alert" role="alert"><span data-icon="alert"></span><span><b>You deserve support right now.</b>If you are in immediate danger, call 112 or 999, or go to the Counseling Centre or the nearest health facility. Your intake will be flagged as urgent so a counselor contacts you as soon as possible.</span></div>
+            </div>
+
+            <div class="form-section">
+              <h3><span class="n">4</span> Your preferences</h3>
+              <div class="field" data-field="urgency">
+                <span class="label">How soon would you like support?</span>
+                <div class="choice-grid">
+                  <label class="choice"><input type="radio" name="urgency" value="routine"><span>Within 2 weeks</span></label>
+                  <label class="choice"><input type="radio" name="urgency" value="soon"><span>This week</span></label>
+                  <label class="choice"><input type="radio" name="urgency" value="urgent"><span>As soon as possible</span></label>
+                </div>
+                <div class="err"></div>
+              </div>
+              <div class="grid-2" style="gap:14px">
+                <div class="field"><label for="contactPref">Preferred session type</label><select class="input" id="contactPref" name="contactPref"><option>In-person</option><option>Online</option><option>No preference</option></select></div>
+                <div class="field"><label for="preferredCounselorId">Preferred counselor</label><select class="input" id="preferredCounselorId" name="preferredCounselorId"><option value="">No preference</option></select></div>
+              </div>
+              <div class="field" data-field="consent">
+                <label class="check"><input type="checkbox" name="consent"> I consent to CampusMind counselors reviewing this information to plan my support. I understand it stays confidential unless there is a serious risk to my safety or someone else's.</label>
+                <div class="err"></div>
+              </div>
+            </div>
+
+            <div class="form-actions"><button type="reset" class="btn btn-outline">Clear form</button><button type="submit" class="btn btn-primary">Submit intake</button></div>
+          </form>
+        </div>
+
+        <aside>
+          <div class="card">
+            <h3>What happens next?</h3>
+            <ul class="list-check small">
+              <li><span data-icon="check-circle"></span>A counselor reviews your intake, usually within one working day.</li>
+              <li><span data-icon="check-circle"></span>Urgent intakes are flagged and prioritised the same day.</li>
+              <li><span data-icon="check-circle"></span>You'll get a notification when a counselor is assigned.</li>
+              <li><span data-icon="check-circle"></span>You can also <a href="book.html">book a session</a> straight away.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Your previous intakes</h3>
+            <div id="history"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api, esc } = CM;
+      const user = await CM.page({ page: 'intake', roles: ['student'] });
+      if (!user) return;
+
+      const CONCERNS = ['Academic stress', 'Anxiety', 'Low mood / Depression', 'Sleep problems', 'Relationships', 'Family issues', 'Financial stress', 'Adjustment to campus', 'Grief & loss', 'Substance use', 'Self-esteem', 'Other'];
+      document.getElementById('concerns').innerHTML = CONCERNS.map(c => '<label class="choice"><input type="checkbox" name="concerns" value="' + esc(c) + '"><span>' + esc(c) + '</span></label>').join('');
+      document.getElementById('preferredCounselorId').innerHTML += api.counselors().map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
+
+      const form = document.getElementById('intake-form');
+      const desc = form.description;
+      desc.addEventListener('input', () => { document.getElementById('desc-count').textContent = desc.value.length; });
+      form.addEventListener('change', e => {
+        if (e.target.name === 'safetyRisk') {
+          const risk = e.target.value === 'yes';
+          document.getElementById('risk-alert').classList.toggle('hide', !risk);
+          if (risk) form.querySelector('[name=urgency][value=urgent]').checked = true;
+        }
+      });
+      form.addEventListener('reset', () => { CM.clearErrors(form); document.getElementById('risk-alert').classList.add('hide'); setTimeout(() => { document.getElementById('desc-count').textContent = 0; }); });
+
+      function renderHistory() {
+        const rows = CM.db.where('intakes', i => i.studentId === user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        document.getElementById('history').innerHTML = rows.length ? rows.map(i =>
+          '<div class="session-item"><div class="info"><b>' + esc(i.concerns.join(', ')) + '</b><span>' + CM.timeAgo(i.createdAt) + (i.assignedTo ? ' · ' + esc(api.displayName(i.assignedTo)) : '') + '</span></div>' + CM.statusBadge(i.status) + '</div>').join('')
+          : '<p class="muted small">No intakes submitted yet.</p>';
+      }
+
+      CM.onSubmit(form, async () => {
+        try {
+          const intake = await api.submitIntake(user, CM.formData(form));
+          form.reset();
+          CM.clearErrors(form);
+          const urgent = intake.urgency === 'urgent';
+          document.getElementById('result').innerHTML = '<div class="alert ' + (urgent ? 'danger' : 'success') + '" role="status">' + CM.icon(urgent ? 'alert' : 'check-circle') +
+            '<span><b>' + (urgent ? 'Your intake has been flagged as urgent.' : 'Thank you, your intake was received.') + '</b>' +
+            (urgent ? 'A counselor will reach out today. If you are in immediate danger call 112 or 999. ' : 'A counselor will review it shortly. ') +
+            'You can <a href="book.html">book a session now</a> or track progress on your <a href="dashboard.html">dashboard</a>.</span></div>';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          renderHistory();
+        } catch (err) {
+          CM.showErrors(form, err);
+        }
+      });
+      renderHistory();
+    })();
+  </script>
+</body>
+</html>

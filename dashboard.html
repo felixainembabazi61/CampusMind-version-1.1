@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Dashboard · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="dashboard">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / My Dashboard</div>
+        <h1 id="greeting">Welcome back</h1>
+        <p id="sub">Here's an overview of your sessions, intake and community activity.</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div id="welcome"></div>
+        <div class="kpis" id="kpis"></div>
+
+        <div class="layout-main-side">
+          <div>
+            <div class="card">
+              <div class="tabs"><button data-tab="upcoming">Upcoming sessions</button><button data-tab="history">Session history</button></div>
+              <div class="tab-panel" id="tab-upcoming"></div>
+              <div class="tab-panel" id="tab-history"></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>My intake forms</h3><a class="btn btn-outline btn-sm" href="intake.html"><span data-icon="plus"></span> New intake</a></div>
+              <div class="table-wrap"><table class="table" id="intakes"></table></div>
+            </div>
+          </div>
+          <aside>
+            <div class="card">
+              <h3>Quick actions</h3>
+              <div style="display:grid;gap:8px">
+                <a class="btn btn-primary" href="book.html"><span data-icon="calendar"></span> Book a session</a>
+                <a class="btn btn-outline" href="messages.html"><span data-icon="message"></span> Message a counselor</a>
+                <a class="btn btn-outline" href="stories.html"><span data-icon="edit"></span> Share a story</a>
+                <a class="btn btn-outline" href="forum.html"><span data-icon="forum"></span> Visit the forum</a>
+              </div>
+            </div>
+            <div class="card">
+              <h3>My profile</h3>
+              <div id="profile" class="small"></div>
+              <button class="btn btn-ghost btn-sm" id="change-pw" style="padding-left:0;margin-top:8px"><span data-icon="lock"></span> Change password</button>
+            </div>
+            <div class="card">
+              <h3>Recent notifications</h3>
+              <div id="notes" class="small"></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api, esc, icon } = CM;
+      const user = await CM.page({ page: 'dashboard', roles: ['student'] });
+      if (!user) return;
+
+      const hr = new Date().getHours();
+      document.getElementById('greeting').textContent = (hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening') + ', ' + user.name.split(' ')[0];
+      if (CM.qs('welcome')) document.getElementById('welcome').innerHTML = '<div class="alert success">' + icon('check-circle') + '<span><b>Your account is ready.</b>A good first step is the confidential <a href="intake.html">intake form</a>, or go straight to <a href="book.html">booking a session</a>.</span></div>';
+
+      function sessionRow(b, actions) {
+        const d = CM.parseDate(b.slot.date);
+        return '<div class="session-item"><div class="date-box"><small>' + CM.MON[d.getMonth()] + '</small><b>' + d.getDate() + '</b></div>' +
+          '<div class="info"><b>' + esc(api.displayName(b.counselorId)) + '</b><span>' + CM.fmtDate(b.slot.date) + ' · ' + b.slot.start + ' – ' + b.slot.end + ' · ' + esc(b.slot.mode) + '</span><br><span>' + esc(b.reason) + '</span></div>' +
+          (actions ? actions : CM.statusBadge(b.status)) + '</div>';
+      }
+
+      function render() {
+        const now = new Date();
+        const all = api.bookingsFor(user);
+        const upcoming = all.filter(b => b.status === 'confirmed' && CM.slotStart(b.slot) > now);
+        const past = all.filter(b => !upcoming.includes(b)).reverse();
+        const intakes = CM.db.where('intakes', i => i.studentId === user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const myStories = CM.db.where('stories', s => s.authorId === user.id);
+
+        document.getElementById('kpis').innerHTML = [
+          ['calendar', upcoming.length, 'Upcoming sessions'], ['check-circle', all.filter(b => b.status === 'completed').length, 'Sessions completed'],
+          ['clipboard', intakes.length, 'Intakes submitted'], ['book', myStories.filter(s => s.status === 'published').length, 'Stories published']
+        ].map(([i, v, l]) => '<div class="kpi"><span class="ic">' + icon(i) + '</span><div><b>' + v + '</b><span>' + l + '</span></div></div>').join('');
+
+        document.getElementById('tab-upcoming').innerHTML = upcoming.length ? upcoming.map(b => sessionRow(b,
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><a class="btn btn-outline btn-sm" href="messages.html" data-msg="' + b.counselorId + '">Message</a><button class="btn btn-danger btn-sm" data-cancel="' + b.id + '">Cancel</button></div>')).join('')
+          : CM.emptyState('calendar', 'No upcoming sessions.', '<a class="btn btn-primary btn-sm" href="book.html">Book a session</a>');
+        document.getElementById('tab-history').innerHTML = past.length ? past.map(b => sessionRow(b)).join('') : CM.emptyState('clock', 'Your past sessions will appear here.');
+
+        document.getElementById('intakes').innerHTML = intakes.length ? '<thead><tr><th>Submitted</th><th>Concerns</th><th>Urgency</th><th>Counselor</th><th>Status</th></tr></thead><tbody>' +
+          intakes.map(i => '<tr><td>' + CM.fmtDateTime(i.createdAt) + '</td><td>' + esc(i.concerns.join(', ')) + '</td><td>' + CM.statusBadge(i.urgency) + '</td><td>' + (i.assignedTo ? esc(api.displayName(i.assignedTo)) : '<span class="muted">Pending</span>') + '</td><td>' + CM.statusBadge(i.status) + '</td></tr>').join('') + '</tbody>'
+          : '<tbody><tr><td>' + CM.emptyState('clipboard', 'You have not submitted an intake yet.') + '</td></tr></tbody>';
+
+        document.getElementById('profile').innerHTML = '<div class="person" style="margin-bottom:10px">' + CM.avatar(user, 'lg') + '<div><b style="font-size:1rem">' + esc(user.name) + '</b><div class="muted">' + esc(user.email) + '</div></div></div>' +
+          '<div><b>Reg. no:</b> ' + esc(user.studentNo || '—') + '</div><div><b>Faculty:</b> ' + esc(user.faculty || '—') + '</div><div><b>Member since:</b> ' + CM.fmtDateTime(user.createdAt).split(',')[0] + '</div>';
+
+        const notes = api.notificationsFor(user.id).slice(0, 5);
+        document.getElementById('notes').innerHTML = notes.length ? notes.map(n => '<div style="padding:8px 0;border-bottom:1px solid var(--line)">' + esc(n.text) + '<div class="muted" style="font-size:.75rem">' + CM.timeAgo(n.createdAt) + '</div></div>').join('') : '<p class="muted">Nothing new.</p>';
+      }
+
+      CM.tabs(document.querySelector('.card'));
+      document.getElementById('main').addEventListener('click', async e => {
+        const c = e.target.closest('[data-cancel]');
+        if (c) {
+          if (!(await CM.confirm('Cancel this session? The time will be released to other students.', 'Cancel session', true))) return;
+          try { await api.cancelBooking(user, c.dataset.cancel); CM.toast('Session cancelled.'); render(); } catch (err) { CM.toast(err.message, 'error'); }
+        }
+        const m = e.target.closest('[data-msg]');
+        if (m) { e.preventDefault(); const conv = await api.openConversation(user, m.dataset.msg); location.href = 'messages.html?c=' + conv.id; }
+      });
+      document.getElementById('change-pw').addEventListener('click', () => {
+        CM.modal({
+          title: 'Change password',
+          body: '<form novalidate><div class="field"><label for="cp-c">Current password</label><input class="input" id="cp-c" type="password" name="current" autocomplete="current-password"></div>' +
+            '<div class="field"><label for="cp-n">New password</label><input class="input" id="cp-n" type="password" name="next" autocomplete="new-password"><div class="hint">At least 8 characters with letters and numbers.</div></div>' +
+            '<div class="form-actions"><button type="button" class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary">Update password</button></div></form>',
+          onMount(m, close) {
+            CM.onSubmit(m.querySelector('form'), async form => {
+              const d = CM.formData(form);
+              try { await api.changePassword(user, d.current, d.next); close(); CM.toast('Password updated.'); } catch (err) { CM.showErrors(form, err); }
+            });
+          }
+        });
+      });
+      render();
+    })();
+  </script>
+</body>
+</html>

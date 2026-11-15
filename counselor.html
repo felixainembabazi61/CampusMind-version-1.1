@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Counselor Workspace · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="counselor">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / Counselor Workspace</div>
+        <h1 id="greeting">Counselor Workspace</h1>
+        <p>Manage your availability, run today's sessions and review incoming intake forms.</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div id="admin-pick"></div>
+        <div id="urgent"></div>
+        <div class="kpis" id="kpis"></div>
+
+        <div class="card" id="workspace">
+          <div class="tabs">
+            <button data-tab="sessions">Sessions</button>
+            <button data-tab="slots">My availability</button>
+            <button data-tab="intakes">Intake queue <span class="badge warn" id="intake-count"></span></button>
+          </div>
+
+          <div class="tab-panel" id="tab-sessions">
+            <div class="filters">
+              <div class="pill-group" id="sess-filter"><button data-f="upcoming" class="active">Upcoming</button><button data-f="past">Past</button><button data-f="all">All</button></div>
+            </div>
+            <div class="table-wrap"><table class="table" id="sessions"></table></div>
+          </div>
+
+          <div class="tab-panel" id="tab-slots">
+            <form id="slot-form" class="filters" novalidate style="align-items:flex-end;background:var(--green-50);padding:16px;border-radius:12px">
+              <div><label class="label" for="s-date">Date</label><input class="input" type="date" id="s-date" name="date" required></div>
+              <div><label class="label" for="s-start">Start</label><input class="input" type="time" id="s-start" name="start" value="09:00" step="900" required></div>
+              <div><label class="label" for="s-dur">Duration</label><select class="input" id="s-dur" name="duration"><option value="45">45 min</option><option value="60" selected>60 min</option><option value="90">90 min</option></select></div>
+              <div><label class="label" for="s-mode">Mode</label><select class="input" id="s-mode" name="mode"><option>In-person</option><option>Online</option></select></div>
+              <div><label class="label" for="s-repeat">Repeat</label><select class="input" id="s-repeat" name="repeat"><option value="1">Once</option><option value="5">Next 5 weekdays</option><option value="4w">Weekly × 4</option></select></div>
+              <button class="btn btn-primary"><span data-icon="plus"></span> Add slot</button>
+            </form>
+            <div class="table-wrap" style="margin-top:16px"><table class="table" id="slots"></table></div>
+          </div>
+
+          <div class="tab-panel" id="tab-intakes">
+            <div class="filters">
+              <div class="pill-group" id="intake-filter"><button data-f="open" class="active">Open</button><button data-f="mine">Assigned to me</button><button data-f="all">All</button></div>
+            </div>
+            <div id="intakes"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api, esc, icon } = CM;
+      const me = await CM.page({ page: 'counselor', roles: ['counselor', 'admin'] });
+      if (!me) return;
+
+      // Admins can open any counselor's workspace; counselors only see their own.
+      let counselor = me.role === 'counselor' ? me : (api.user(CM.qs('as')) || api.counselors()[0]);
+      if (me.role === 'admin') {
+        document.getElementById('admin-pick').innerHTML = '<div class="alert">' + icon('info') + '<span style="flex:1"><b>Administrator view</b>Managing the schedule of: <select class="input" id="as" style="width:auto;display:inline-block;padding:6px 10px;margin-left:6px">' +
+          api.counselors().map(c => '<option value="' + c.id + '" ' + (c.id === counselor.id ? 'selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select></span></div>';
+        document.getElementById('as').addEventListener('change', e => { location.search = '?as=' + e.target.value; });
+      }
+      document.getElementById('greeting').textContent = me.role === 'counselor' ? 'Welcome, ' + me.name : counselor.name + "'s Workspace";
+      document.getElementById('s-date').min = CM.addDays(0);
+      document.getElementById('s-date').value = CM.addDays(1);
+
+      let sessFilter = 'upcoming', intakeFilter = 'open';
+
+      function render() {
+        counselor = api.user(counselor.id) || counselor;
+        const now = new Date();
+        const today = CM.addDays(0);
+        const bookings = CM.db.where('bookings', b => b.counselorId === counselor.id).map(b => Object.assign({}, b, { slot: CM.db.find('slots', b.slotId) || {} }));
+        const upcoming = bookings.filter(b => b.status === 'confirmed' && CM.slotStart(b.slot) > now);
+        const todayCount = bookings.filter(b => b.slot.date === today && b.status !== 'cancelled').length;
+        const openSlots = CM.db.where('slots', s => s.counselorId === counselor.id && s.status === 'open' && CM.slotStart(s) > now);
+        const intakesAll = CM.db.all('intakes').filter(i => me.role === 'admin' || !i.preferredCounselorId || i.preferredCounselorId === counselor.id || i.assignedTo === counselor.id);
+        const openIntakes = intakesAll.filter(i => i.status === 'new');
+        const urgent = intakesAll.filter(i => i.urgency === 'urgent' && !['closed', 'reviewed'].includes(i.status));
+
+        document.getElementById('urgent').innerHTML = urgent.length ? '<div class="alert danger">' + icon('alert') + '<span><b>' + urgent.length + ' urgent intake' + (urgent.length > 1 ? 's' : '') + ' need attention.</b><a href="#intakes" data-goto="intakes">Review now</a>. Contact the student the same day.</span></div>' : '';
+        document.getElementById('kpis').innerHTML = [
+          ['calendar', todayCount, 'Sessions today'], ['clock', upcoming.length, 'Upcoming sessions'],
+          ['grid', openSlots.length, 'Open slots'], ['clipboard', openIntakes.length, 'New intakes', openIntakes.length && urgent.length]
+        ].map(([i, v, l, a]) => '<div class="kpi ' + (a ? 'kpi-alert' : '') + '"><span class="ic">' + icon(i) + '</span><div><b>' + v + '</b><span>' + l + '</span></div></div>').join('');
+        document.getElementById('intake-count').textContent = openIntakes.length || '';
+
+        // sessions
+        let rows = sessFilter === 'upcoming' ? upcoming : sessFilter === 'past' ? bookings.filter(b => !upcoming.includes(b)) : bookings;
+        rows = rows.sort((a, b) => sessFilter === 'upcoming' ? CM.slotStart(a.slot) - CM.slotStart(b.slot) : CM.slotStart(b.slot) - CM.slotStart(a.slot));
+        document.getElementById('sessions').innerHTML = rows.length ? '<thead><tr><th>When</th><th>Student</th><th>Reason</th><th>Mode</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(b => {
+          const st = api.user(b.studentId) || {};
+          const isPast = CM.slotStart(b.slot) <= now;
+          return '<tr><td><b>' + CM.fmtDate(b.slot.date) + '</b><br><span class="muted">' + b.slot.start + ' – ' + b.slot.end + '</span></td>' +
+            '<td><div class="person">' + CM.avatar(st) + '<div>' + esc(st.name) + '<div class="small muted">' + esc(st.studentNo || '') + '</div></div></div></td>' +
+            '<td style="max-width:240px">' + esc(b.reason) + (b.notes ? '<div class="small muted">Note: ' + esc(b.notes) + '</div>' : '') + '</td><td>' + esc(b.slot.mode) + '</td><td>' + CM.statusBadge(b.status) + '</td>' +
+            '<td><div class="actions">' +
+            (b.status === 'confirmed' && isPast ? '<button class="btn btn-outline btn-sm" data-done="' + b.id + '">Complete</button><button class="btn btn-ghost btn-sm" data-noshow="' + b.id + '">No-show</button>' : '') +
+            (b.status === 'confirmed' && !isPast ? '<button class="btn btn-outline btn-sm" data-msg="' + b.studentId + '">Message</button><button class="btn btn-danger btn-sm" data-cancel="' + b.id + '">Cancel</button>' : '') +
+            (['completed', 'no-show'].includes(b.status) ? '<button class="btn btn-ghost btn-sm" data-note="' + b.id + '">' + (b.notes ? 'Edit note' : 'Add note') + '</button>' : '') +
+            '</div></td></tr>';
+        }).join('') + '</tbody>' : '<tbody><tr><td>' + CM.emptyState('calendar', 'No sessions in this view.') + '</td></tr></tbody>';
+
+        // slots
+        const slots = CM.db.where('slots', s => s.counselorId === counselor.id && s.date >= today).sort((a, b) => CM.slotStart(a) - CM.slotStart(b));
+        document.getElementById('slots').innerHTML = slots.length ? '<thead><tr><th>Date</th><th>Time</th><th>Mode</th><th>Status</th><th></th></tr></thead><tbody>' + slots.map(s =>
+          '<tr><td>' + CM.fmtDate(s.date) + '</td><td>' + s.start + ' – ' + s.end + '</td><td>' + esc(s.mode) + '</td><td>' + CM.statusBadge(s.status === 'booked' ? 'confirmed' : s.status) + '</td>' +
+          '<td><div class="actions">' + (s.status === 'open' ? '<button class="btn btn-danger btn-sm" data-del-slot="' + s.id + '">' + icon('trash') + 'Remove</button>' : '') + '</div></td></tr>').join('') + '</tbody>'
+          : '<tbody><tr><td>' + CM.emptyState('calendar', 'No upcoming slots. Add some availability above.') + '</td></tr></tbody>';
+
+        // intakes
+        let list = intakeFilter === 'open' ? intakesAll.filter(i => ['new', 'assigned'].includes(i.status)) : intakeFilter === 'mine' ? intakesAll.filter(i => i.assignedTo === counselor.id) : intakesAll;
+        list = list.sort((a, b) => (b.urgency === 'urgent') - (a.urgency === 'urgent') || b.createdAt.localeCompare(a.createdAt));
+        const moods = ['', 'Very low', 'Low', 'Okay', 'Good', 'Great'];
+        document.getElementById('intakes').innerHTML = list.length ? list.map(i => {
+          const st = api.user(i.studentId) || {};
+          return '<div class="card" style="box-shadow:none;border:1px solid ' + (i.urgency === 'urgent' ? 'var(--danger)' : 'var(--line)') + ';margin-top:12px">' +
+            '<div class="card-head" style="margin-bottom:10px"><div class="person">' + CM.avatar(st) + '<div><b>' + esc(st.name) + '</b><div class="small muted">' + esc(st.studentNo || '') + ' · ' + esc(st.faculty || '') + ' · ' + CM.timeAgo(i.createdAt) + '</div></div></div>' +
+            '<div style="display:flex;gap:6px">' + CM.statusBadge(i.urgency) + CM.statusBadge(i.status) + '</div></div>' +
+            (i.safetyRisk ? '<div class="alert danger" style="margin-bottom:10px">' + icon('alert') + '<span><b>Student reported thoughts of self-harm.</b>Follow your safety protocol and contact them today.</span></div>' : '') +
+            '<div class="tags">' + i.concerns.map(c => '<span class="badge">' + esc(c) + '</span>').join('') + '</div>' +
+            '<p style="margin:8px 0">' + esc(i.description) + '</p>' +
+            '<div class="meta-line"><span><b>Mood:</b> ' + moods[i.mood] + '</span><span><b>Duration:</b> ' + esc(i.duration) + '</span><span><b>Prefers:</b> ' + esc(i.contactPref) + '</span>' +
+            (i.assignedTo ? '<span><b>Assigned:</b> ' + esc(api.displayName(i.assignedTo)) + '</span>' : '') + '</div>' +
+            (i.counselorNote ? '<div class="small" style="margin-top:8px;background:var(--green-50);padding:8px 10px;border-radius:8px"><b>Note:</b> ' + esc(i.counselorNote) + '</div>' : '') +
+            '<div class="form-actions" style="justify-content:flex-start">' +
+            (i.assignedTo !== counselor.id ? '<button class="btn btn-primary btn-sm" data-assign="' + i.id + '">Assign to ' + (me.role === 'admin' ? esc(counselor.name.split(' ').slice(-1)[0]) : 'me') + '</button>' : '') +
+            (i.status !== 'reviewed' && i.status !== 'closed' ? '<button class="btn btn-outline btn-sm" data-review="' + i.id + '">Mark reviewed</button>' : '') +
+            '<button class="btn btn-ghost btn-sm" data-inote="' + i.id + '">Add note</button>' +
+            '<button class="btn btn-ghost btn-sm" data-msg="' + i.studentId + '">Message student</button>' +
+            (i.status !== 'closed' ? '<button class="btn btn-ghost btn-sm" data-close-intake="' + i.id + '">Close</button>' : '') + '</div></div>';
+        }).join('') : CM.emptyState('inbox', 'No intakes in this view.');
+      }
+
+      const showTab = CM.tabs(document.getElementById('workspace'));
+      document.getElementById('sess-filter').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; sessFilter = b.dataset.f; document.querySelectorAll('#sess-filter button').forEach(x => x.classList.toggle('active', x === b)); render(); });
+      document.getElementById('intake-filter').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; intakeFilter = b.dataset.f; document.querySelectorAll('#intake-filter button').forEach(x => x.classList.toggle('active', x === b)); render(); });
+
+      CM.onSubmit(document.getElementById('slot-form'), async form => {
+        try {
+          const res = await api.addSlots(me, Object.assign(CM.formData(form), { counselorId: counselor.id }));
+          CM.toast(res.added + ' slot' + (res.added > 1 ? 's' : '') + ' added.');
+          if (res.errors.length) CM.toast(res.errors[0] + (res.errors.length > 1 ? ' (+' + (res.errors.length - 1) + ' more)' : ''), 'error');
+        } catch (err) { CM.toast(err.message, 'error'); }
+        render();
+      });
+      function noteModal(title, current, save) {
+        CM.modal({
+          title,
+          body: '<form><div class="field"><label for="n-t">Private note (only counseling staff can see this)</label><textarea class="input" id="n-t" name="note" rows="5" maxlength="1000">' + esc(current || '') + '</textarea></div><div class="form-actions"><button type="button" class="btn btn-outline" data-close>Cancel</button><button class="btn btn-primary">Save note</button></div></form>',
+          onMount(m, close) {
+            CM.onSubmit(m.querySelector('form'), async form => {
+              try { await save(form.note.value.trim()); close(); CM.toast('Note saved.'); render(); } catch (err) { CM.toast(err.message, 'error'); }
+            });
+          }
+        });
+      }
+
+      document.getElementById('main').addEventListener('click', async e => {
+        const t = e.target.closest('button, a'); if (!t) return;
+        const ds = t.dataset;
+        try {
+          if (ds.goto) { e.preventDefault(); showTab(ds.goto); return; }
+          if (ds.done) { await api.setBookingStatus(me, ds.done, 'completed'); CM.toast('Session marked as completed.'); }
+          else if (ds.noshow) { await api.setBookingStatus(me, ds.noshow, 'no-show'); CM.toast('Marked as no-show.'); }
+          else if (ds.cancel) { if (!(await CM.confirm('Cancel this session? The student will be notified.', 'Cancel session', true))) return; await api.cancelBooking(me, ds.cancel); CM.toast('Session cancelled and student notified.'); }
+          else if (ds.note) { const b = CM.db.find('bookings', ds.note); noteModal('Session note', b.notes, v => api.setBookingStatus(me, b.id, b.status, v)); return; }
+          else if (ds.delSlot) { await api.removeSlot(me, ds.delSlot); CM.toast('Slot removed.'); }
+          else if (ds.assign) { await api.updateIntake(me, ds.assign, { assignedTo: counselor.id, status: 'assigned' }); CM.toast('Intake assigned. The student has been notified.'); }
+          else if (ds.review) { await api.updateIntake(me, ds.review, { status: 'reviewed' }); CM.toast('Intake marked as reviewed.'); }
+          else if (ds.closeIntake) { await api.updateIntake(me, ds.closeIntake, { status: 'closed' }); CM.toast('Intake closed.'); }
+          else if (ds.inote) { const i = CM.db.find('intakes', ds.inote); noteModal('Intake note', i.counselorNote, v => api.updateIntake(me, i.id, { counselorNote: v })); return; }
+          else if (ds.msg) { const c = await api.openConversation(me, ds.msg); location.href = 'messages.html?c=' + c.id; return; }
+          else return;
+          render();
+        } catch (err) { CM.toast(err.message, 'error'); }
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Messages · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="messages">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / Messages</div>
+        <h1>Private Messages</h1>
+        <p>Secure follow-ups between students and counselors. Messages are only visible to the people in the conversation.</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="chat">
+          <div class="chat-list">
+            <div class="head"><button class="btn btn-primary btn-block btn-sm" id="new-convo"><span data-icon="plus"></span> New conversation</button></div>
+            <div id="convos"></div>
+          </div>
+          <div class="chat-pane" id="pane"></div>
+        </div>
+        <p class="small muted" style="margin-top:12px">Messages are not monitored around the clock. If you need urgent help, call 112 or 999 or visit the counseling centre.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api, esc, icon } = CM;
+      const user = await CM.page({ page: 'messages', roles: ['student', 'counselor', 'moderator', 'admin'] });
+      if (!user) return;
+      let current = CM.qs('c');
+
+      function renderList() {
+        const list = api.conversationsFor(user);
+        if (!current && list.length && window.innerWidth > 1080) current = list[0].id;
+        document.getElementById('convos').innerHTML = list.length ? list.map(c => {
+          const other = api.user(c.otherId);
+          return '<button class="convo ' + (c.id === current ? 'active' : '') + '" data-c="' + c.id + '">' + CM.avatar(other) + '<span class="txt"><b>' + esc(other ? other.name : 'Unknown') + '</b><small>' + esc(c.last ? c.last.body : 'No messages yet') + '</small></span>' +
+            (c.unread ? '<span class="badge danger">' + c.unread + '</span>' : '') + '</button>';
+        }).join('') : '<p class="small muted" style="padding:16px">No conversations yet.</p>';
+      }
+
+      function renderPane() {
+        const pane = document.getElementById('pane');
+        const c = current && CM.db.find('conversations', current);
+        if (!c || !c.participants.includes(user.id)) { pane.innerHTML = CM.emptyState('message', 'Select a conversation or start a new one.'); return; }
+        if (CM.db.where('messages', m => m.conversationId === c.id && !m.readBy.includes(user.id)).length) api.markRead(user, c.id).then(renderList).catch(() => {});
+        const other = api.user(c.participants.find(p => p !== user.id));
+        const msgs = CM.db.where('messages', m => m.conversationId === c.id);
+        pane.innerHTML = '<div class="head">' + CM.avatar(other) + '<div><b>' + esc(other.name) + '</b><div class="small muted">' + esc(other.title || other.role) + '</div></div></div>' +
+          '<div class="chat-msgs" id="msgs">' + (msgs.length ? msgs.map(m => '<div class="msg ' + (m.senderId === user.id ? 'me' : '') + '">' + esc(m.body) + '<time>' + CM.fmtDateTime(m.createdAt) + '</time></div>').join('') : '<p class="muted small center">Say hello 👋</p>') + '</div>' +
+          '<form class="chat-form" id="send-form"><textarea class="input" name="body" placeholder="Write a message…" aria-label="Message" maxlength="2000"></textarea><button class="btn btn-primary" aria-label="Send">' + icon('send') + '</button></form>';
+        const box = document.getElementById('msgs'); box.scrollTop = box.scrollHeight;
+        const form = document.getElementById('send-form');
+        form.body.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+        CM.onSubmit(form, async () => {
+          try { await api.sendMessage(user, c.id, form.body.value); renderList(); renderPane(); document.querySelector('#send-form textarea').focus(); }
+          catch (err) { CM.toast(err.message, 'error'); }
+        });
+      }
+
+      document.getElementById('convos').addEventListener('click', e => {
+        const b = e.target.closest('[data-c]'); if (!b) return;
+        current = b.dataset.c; history.replaceState(null, '', '?c=' + current); renderList(); renderPane();
+      });
+      document.getElementById('new-convo').addEventListener('click', () => {
+        const contacts = api.contactsFor(user);
+        CM.modal({
+          title: 'New conversation',
+          body: contacts.length ? '<p class="small muted">' + (user.role === 'student' ? 'Students can message counselors directly.' : 'Counseling staff can message any student or colleague.') + '</p>' +
+            '<div class="counselor-list">' + contacts.map(c => '<button class="counselor-opt" data-to="' + c.id + '">' + CM.avatar(c) + '<span><b>' + esc(c.name) + '</b><small>' + esc(c.title || c.role) + '</small></span></button>').join('') + '</div>'
+            : CM.emptyState('users', 'There is no one you can message yet.'),
+          onMount(m, close) {
+            m.addEventListener('click', async e => {
+              const b = e.target.closest('[data-to]'); if (!b) return;
+              let c;
+              try { c = await api.openConversation(user, b.dataset.to); } catch (err) { CM.toast(err.message, 'error'); return; }
+              current = c.id; close(); history.replaceState(null, '', '?c=' + current); renderList(); renderPane();
+            });
+          }
+        });
+      });
+
+      renderList(); renderPane();
+    })();
+  </script>
+</body>
+</html>

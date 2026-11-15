@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System Tests · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="tests">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / System Tests</div>
+        <h1>Testing &amp; Validation</h1>
+        <p>Automated checks that confirm CampusMind behaves as specified. Business rules are tested in PHP against a fresh temporary database, so your real data is never touched.</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="kpis" id="summary"></div>
+        <div class="card">
+          <div class="card-head"><h3>Test results</h3><button class="btn btn-primary" id="run"><span data-icon="refresh"></span> Run again</button></div>
+          <div id="results"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { icon, esc } = CM;
+      await CM.page({ page: 'tests' });
+      if (CM.db.app.live) {
+        document.getElementById('main').innerHTML = '<div class="wrap"><div class="denied">' + icon('lock') + '<h2>Not available</h2><p class="muted">System tests run on the local copy of CampusMind only.</p><a class="btn btn-primary" href="index.html">Back to home</a></div></div>';
+        return;
+      }
+      const PAGES = ['index.html', 'about.html', 'login.html', 'register.html', 'book.html', 'intake.html', 'stories.html', 'forum.html', 'thread.html',
+        'messages.html', 'dashboard.html', 'counselor.html', 'moderation.html', 'admin.html'];
+      function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion failed'); }
+
+      // checks that need a real browser; the business-rule tests run on the server (api/tests.php)
+      const BROWSER_TESTS = [
+        ['Report §10a', 'The application loads successfully (home page renders)', async () => {
+          const res = await fetch('index.html', { cache: 'no-store' });
+          assert(res.ok, 'index.html returned ' + res.status);
+          assert((await res.text()).includes('app-header'), 'Home page markup is missing expected content');
+        }],
+        ['Pages', 'Every page in the site is reachable', async () => {
+          const bad = [];
+          for (const p of PAGES) { const r = await fetch(p, { cache: 'no-store' }); if (!r.ok) bad.push(p + ' (' + r.status + ')'); }
+          assert(!bad.length, 'Unreachable: ' + bad.join(', '));
+        }],
+        ['API', 'The PHP API and database respond', async () => {
+          await CM.api.load();
+          assert(CM.db.all('forumCategories').length > 0, 'No data returned from the database');
+        }],
+        ['Security', 'The database file and configuration cannot be downloaded', async () => {
+          for (const p of ['storage/campusmind.sqlite', 'api/config.php', 'api/lib/CampusMind.php']) {
+            const r = await fetch(p, { cache: 'no-store' });
+            assert(r.status === 403 || r.status === 404, p + ' is publicly readable');
+          }
+        }],
+        ['Security', 'Login redirects only go to pages on this site', () => {
+          assert(CM.safeNext('book.html') === 'book.html', 'Valid next page was rejected');
+          ['https://evil.example', '//evil.example', 'javascript:alert(1)', '../secret.html'].forEach(n => assert(CM.safeNext(n) === null, 'Unsafe redirect allowed: ' + n));
+        }],
+        ['Security', 'User content is escaped before display (XSS protection)', () => {
+          assert(esc('<img src=x onerror=alert(1)>') === '&lt;img src=x onerror=alert(1)&gt;', 'HTML not escaped');
+          assert(esc('"' + "'" + '&') === '&quot;&#39;&amp;', 'Quotes/ampersand not escaped');
+        }]
+      ];
+
+      async function run() {
+        const box = document.getElementById('results');
+        box.innerHTML = '<p class="muted">Running…</p>';
+        const out = [];
+        const t0 = performance.now();
+        for (const [area, name, fn] of BROWSER_TESTS) {
+          try { await fn(); out.push({ status: 'pass', area, name }); }
+          catch (e) { out.push({ status: 'fail', area, name, message: e.message }); }
+        }
+        try {
+          const res = await fetch('api/tests.php', { cache: 'no-store' });
+          const json = await res.json();
+          out.push(...json.results);
+        } catch (e) {
+          out.push({ status: 'fail', area: 'Server', name: 'Server-side test suite (api/tests.php)', message: 'Could not run: ' + e.message });
+        }
+        const ms = Math.round(performance.now() - t0);
+        const count = st => out.filter(r => r.status === st).length;
+        document.getElementById('summary').innerHTML = [
+          ['check-circle', count('pass'), 'Passed'], ['x-circle', count('fail'), 'Failed', count('fail')], ['info', count('skip'), 'Skipped'], ['clock', ms + 'ms', 'Duration']
+        ].map(([i, v, l, a]) => '<div class="kpi ' + (a ? 'kpi-alert' : '') + '"><span class="ic">' + icon(i) + '</span><div><b>' + v + '</b><span>' + l + '</span></div></div>').join('');
+        box.innerHTML = out.map(r => '<div class="test-row ' + r.status + '">' + icon(r.status === 'pass' ? 'check-circle' : r.status === 'fail' ? 'x-circle' : 'info') +
+          '<div style="flex:1"><b>' + esc(r.name) + '</b>' + (r.message ? '<code>' + esc(r.message) + '</code>' : '') + '</div><span class="badge ' + (r.status === 'fail' ? 'danger' : r.status === 'skip' ? 'grey' : '') + '">' + esc(r.area) + '</span></div>').join('');
+      }
+      document.getElementById('run').addEventListener('click', run);
+      run();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="login">
+  <div id="app-header"></div>
+
+  <main id="main" class="auth">
+    <div class="auth-side" style="background-image:url('https://images.unsplash.com/photo-1499209974431-9dddcece7f88?w=1200&q=70&auto=format&fit=crop')">
+      <div>
+        <span class="eyebrow" style="color:#9fd3b8">Welcome back</span>
+        <h2>Every step forward counts, including this one.</h2>
+        <p>Log in to manage your sessions, follow up on your intake and stay connected with the community.</p>
+      </div>
+    </div>
+    <div class="auth-main">
+      <div class="auth-box">
+        <h1 style="font-size:2.2rem">Log in</h1>
+        <p class="muted">Use your CampusMind account. Students, counselors, moderators and administrators all sign in here.</p>
+        <div id="notice"></div>
+        <form id="login-form" novalidate>
+          <div class="field" data-field="email">
+            <label for="email">Email address</label>
+            <div class="input-icon"><span data-icon="mail"></span><input class="input" id="email" name="email" type="email" autocomplete="username" required></div>
+          </div>
+          <div class="field" data-field="password">
+            <label for="password">Password</label>
+            <div class="input-icon"><span data-icon="lock"></span><input class="input" id="password" name="password" type="password" autocomplete="current-password" required></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+            <label class="check"><input type="checkbox" id="show-pw"> Show password</label>
+            <a href="#" id="forgot" class="small">Forgot password?</a>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Log in <span data-icon="arrow-right"></span></button>
+        </form>
+        <p class="center small" style="margin-top:18px">New to CampusMind? <a href="register.html" id="reg-link"><b>Create a student account</b></a></p>
+
+        <div class="demo-accounts" id="demo-accounts">
+          <b>Demo accounts</b> <span class="muted">(click to fill)</span><br>
+          <button type="button" data-demo="student@must.ac.ug|Student@123">Student</button>
+          <button type="button" data-demo="sarah.namara@campusmind.ac.ug|Counselor@123">Counselor</button>
+          <button type="button" data-demo="moderator@campusmind.ac.ug|Moderator@123">Moderator</button>
+          <button type="button" data-demo="admin@campusmind.ac.ug|Admin@123">Administrator</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api } = CM;
+      const next = CM.safeNext(CM.qs('next'));
+      const current = await CM.page({ page: 'login' });
+      if (current) { location.replace(next || api.homeFor(current)); return; }
+      if (CM.db.app.live) document.getElementById('demo-accounts').remove(); // never advertise logins on the public site
+
+      if (next) {
+        document.getElementById('notice').innerHTML = '<div class="alert">' + CM.icon('info') + '<span>Please log in to continue to that page.</span></div>';
+        document.getElementById('reg-link').href = 'register.html?next=' + encodeURIComponent(next);
+      }
+      const form = document.getElementById('login-form');
+      document.getElementById('show-pw').addEventListener('change', e => { form.password.type = e.target.checked ? 'text' : 'password'; });
+      document.getElementById('forgot').addEventListener('click', e => {
+        e.preventDefault();
+        CM.modal({ title: 'Reset your password', body: '<p>For your security, password resets are handled in person or by email by the CampusMind administrator.</p><p>Email <a href="mailto:counseling@campusmind.ac.ug">counseling@campusmind.ac.ug</a> from your university address, or visit the counseling centre with your student ID.</p><div class="form-actions"><button class="btn btn-primary" data-close>Got it</button></div>' });
+      });
+      document.querySelectorAll('[data-demo]').forEach(b => b.addEventListener('click', () => {
+        const [e, p] = b.dataset.demo.split('|');
+        form.email.value = e; form.password.value = p;
+      }));
+
+      // the server checks the password, limits repeated attempts and starts a secure session
+      CM.onSubmit(form, async () => {
+        CM.clearErrors(form);
+        try {
+          const res = await api.login(form.email.value, form.password.value);
+          location.href = next || res.home;
+        } catch (err) {
+          CM.showErrors(form, { message: err.message, fields: { email: '', password: '' } });
+          form.password.value = '';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

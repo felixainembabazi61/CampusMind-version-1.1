@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moderation · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="moderation">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / Moderation</div>
+        <h1>Moderation Review Queue</h1>
+        <p>Keep the community safe: review reported content, approve stories and manage forum discussions.</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap">
+        <div class="kpis" id="kpis"></div>
+        <div class="card" id="mod">
+          <div class="tabs">
+            <button data-tab="reports">Reports <span class="badge warn" id="c-reports"></span></button>
+            <button data-tab="stories">Pending stories <span class="badge warn" id="c-stories"></span></button>
+            <button data-tab="forum">Forum discussions</button>
+            <button data-tab="hidden">Hidden content</button>
+          </div>
+          <div class="tab-panel" id="tab-reports"></div>
+          <div class="tab-panel" id="tab-stories"></div>
+          <div class="tab-panel" id="tab-forum"><div class="table-wrap"><table class="table" id="posts"></table></div></div>
+          <div class="tab-panel" id="tab-hidden"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api, esc, icon } = CM;
+      const me = await CM.page({ page: 'moderation', roles: ['moderator', 'admin'] });
+      if (!me) return;
+
+      function contentPreview(type, row) {
+        if (!row) return '<p class="muted">The content no longer exists.</p>';
+        const link = type === 'story' ? 'stories.html#' + row.id : 'thread.html?id=' + (type === 'post' ? row.id : row.postId);
+        return '<div style="background:var(--cream);border-radius:10px;padding:12px 14px;margin:10px 0">' +
+          '<div class="meta-line"><span class="badge grey">' + type + '</span><b style="color:var(--ink)">' + esc(api.displayName(row.authorId, false)) + '</b>' + (row.anonymous ? '<span>(posted anonymously)</span>' : '') + '<span>' + CM.timeAgo(row.createdAt) + '</span>' + CM.statusBadge(row.status) + '</div>' +
+          (row.title ? '<b style="display:block;margin-top:6px">' + esc(row.title) + '</b>' : '') +
+          '<p style="margin:6px 0 0;white-space:pre-line">' + esc(row.body.length > 400 ? row.body.slice(0, 400) + '…' : row.body) + '</p>' +
+          '<a class="link-arrow small" href="' + link + '" target="_blank" rel="noopener">View in context ' + icon('arrow-right') + '</a></div>';
+      }
+
+      function render() {
+        const reports = CM.db.where('reports', r => r.status === 'open').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const pending = CM.db.where('stories', s => s.status === 'pending');
+        const s = api.stats();
+        const resolved = CM.db.where('reports', r => r.status !== 'open').length;
+        document.getElementById('kpis').innerHTML = [
+          ['flag', reports.length, 'Open reports', reports.length], ['book', pending.length, 'Stories awaiting review', pending.length],
+          ['check-circle', resolved, 'Reports handled'], ['forum', s.posts, 'Live discussions']
+        ].map(([i, v, l, a]) => '<div class="kpi ' + (a ? 'kpi-alert' : '') + '"><span class="ic">' + icon(i) + '</span><div><b>' + v + '</b><span>' + l + '</span></div></div>').join('');
+        document.getElementById('c-reports').textContent = reports.length || '';
+        document.getElementById('c-stories').textContent = pending.length || '';
+
+        document.getElementById('tab-reports').innerHTML = reports.length ? reports.map(r => {
+          const risk = /self-harm/i.test(r.reason);
+          return '<div class="card" style="box-shadow:none;border:1px solid ' + (risk ? 'var(--danger)' : 'var(--line)') + ';margin-top:12px">' +
+            '<div class="card-head" style="margin-bottom:0"><div><b>' + esc(r.reason) + '</b><div class="small muted">Reported by ' + esc(api.displayName(r.reporterId)) + ' · ' + CM.timeAgo(r.createdAt) + '</div></div>' + (risk ? '<span class="badge danger">safety concern</span>' : '') + '</div>' +
+            (r.details ? '<p class="small" style="margin:8px 0 0">“' + esc(r.details) + '”</p>' : '') +
+            (risk ? '<div class="alert danger" style="margin:10px 0 0">' + icon('alert') + '<span>Escalate to the counseling team so someone can check in with the author today.</span></div>' : '') +
+            contentPreview(r.targetType, api.reportTarget(r)) +
+            '<div class="form-actions" style="justify-content:flex-start"><button class="btn btn-danger btn-sm" data-hide="' + r.id + '">' + icon('eye-off') + 'Hide content</button><button class="btn btn-outline btn-sm" data-dismiss="' + r.id + '">Dismiss report</button>' +
+            (risk ? '<button class="btn btn-ghost btn-sm" data-escalate="' + r.id + '">Notify counselors</button>' : '') + '</div></div>';
+        }).join('') : CM.emptyState('check-circle', 'No open reports. The community is in good shape.');
+
+        document.getElementById('tab-stories').innerHTML = pending.length ? pending.map(st =>
+          '<div class="card" style="box-shadow:none;border:1px solid var(--line);margin-top:12px">' + contentPreview('story', Object.assign({}, st, { body: st.body })) +
+          '<div class="tags">' + st.tags.map(t => '<span class="badge">' + esc(t) + '</span>').join('') + '</div>' +
+          '<div class="form-actions" style="justify-content:flex-start"><button class="btn btn-primary btn-sm" data-approve="' + st.id + '">' + icon('check') + 'Approve &amp; publish</button><button class="btn btn-danger btn-sm" data-reject="' + st.id + '">Reject</button></div></div>').join('')
+          : CM.emptyState('book', 'No stories waiting for review.');
+
+        const posts = CM.db.where('forumPosts', p => p.status === 'visible').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        document.getElementById('posts').innerHTML = '<thead><tr><th>Discussion</th><th>Author</th><th>Replies</th><th>Flags</th><th></th></tr></thead><tbody>' + posts.map(p =>
+          '<tr><td><a href="thread.html?id=' + p.id + '"><b>' + esc(p.title) + '</b></a><div class="small muted">' + esc((CM.db.find('forumCategories', p.categoryId) || {}).name) + ' · ' + CM.timeAgo(p.createdAt) + '</div></td>' +
+          '<td>' + esc(api.displayName(p.authorId)) + (p.anonymous ? ' <span class="small muted">(anon)</span>' : '') + '</td><td>' + api.commentsFor(p.id).length + '</td>' +
+          '<td>' + (p.pinned ? '<span class="badge warn">pinned</span> ' : '') + (p.locked ? '<span class="badge grey">locked</span>' : '') + '</td>' +
+          '<td><div class="actions"><button class="btn btn-ghost btn-sm" data-pin="' + p.id + '">' + (p.pinned ? 'Unpin' : 'Pin') + '</button><button class="btn btn-ghost btn-sm" data-lock="' + p.id + '">' + (p.locked ? 'Unlock' : 'Lock') + '</button><button class="btn btn-danger btn-sm" data-hidepost="' + p.id + '">Hide</button></div></td></tr>').join('') + '</tbody>';
+
+        const hidden = [].concat(
+          CM.db.where('stories', x => ['hidden', 'rejected'].includes(x.status)).map(x => ['story', x]),
+          CM.db.where('forumPosts', x => x.status === 'hidden').map(x => ['post', x]),
+          CM.db.where('forumComments', x => x.status === 'hidden').map(x => ['comment', x]));
+        document.getElementById('tab-hidden').innerHTML = hidden.length ? hidden.map(([t, row]) => '<div style="border-bottom:1px solid var(--line);padding-bottom:6px">' + contentPreview(t, row) +
+          '<button class="btn btn-outline btn-sm" data-restore="' + t + ':' + row.id + '" style="margin-bottom:10px">Restore</button></div>').join('') : CM.emptyState('eye-off', 'Nothing has been hidden.');
+      }
+
+      CM.tabs(document.getElementById('mod'));
+      document.getElementById('mod').addEventListener('click', async e => {
+        const b = e.target.closest('button'); if (!b) return;
+        const d = b.dataset;
+        try {
+          if (d.hide) { await api.resolveReport(me, d.hide, 'hide'); CM.toast('Content hidden and report resolved.'); }
+          else if (d.dismiss) { await api.resolveReport(me, d.dismiss, 'dismiss'); CM.toast('Report dismissed.'); }
+          else if (d.escalate) {
+            await api.escalateReport(me, d.escalate);
+            CM.toast('Counselors have been notified.'); return;
+          }
+          else if (d.approve) { await api.moderateStory(me, d.approve, 'published'); CM.toast('Story published.'); }
+          else if (d.reject) {
+            CM.modal({
+              title: 'Reject story', body: '<form><div class="field"><label for="rj">Message to the author (optional)</label><textarea class="input" id="rj" name="note" rows="3" placeholder="e.g. Please remove the names of other students and resubmit."></textarea></div><div class="form-actions"><button type="button" class="btn btn-outline" data-close>Cancel</button><button class="btn btn-danger">Reject story</button></div></form>',
+              onMount(m, close) {
+                CM.onSubmit(m.querySelector('form'), async form => {
+                  try { await api.moderateStory(me, d.reject, 'rejected', form.note.value.trim()); close(); CM.toast('Story rejected. The author has been notified.'); render(); }
+                  catch (err) { CM.toast(err.message, 'error'); }
+                });
+              }
+            });
+            return;
+          }
+          else if (d.pin) { const p = CM.db.find('forumPosts', d.pin); await api.setPostFlags(me, p.id, { pinned: !p.pinned }); }
+          else if (d.lock) { const p = CM.db.find('forumPosts', d.lock); await api.setPostFlags(me, p.id, { locked: !p.locked }); }
+          else if (d.hidepost) { if (!(await CM.confirm('Hide this discussion from the forum?', 'Hide', true))) return; await api.setPostFlags(me, d.hidepost, { status: 'hidden' }); CM.toast('Discussion hidden.'); }
+          else if (d.restore) {
+            const [t, id] = d.restore.split(':');
+            await api.restoreContent(me, t, id);
+            CM.toast('Content restored.');
+          }
+          else return;
+          render();
+        } catch (err) { CM.toast(err.message, 'error'); }
+      });
+      render();
+    })();
+  </script>
+</body>
+</html>

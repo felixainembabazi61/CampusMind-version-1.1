@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book a Session · CampusMind</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="book">
+  <div id="app-header"></div>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="wrap">
+        <div class="crumbs"><a href="index.html">Home</a> / Book a Session</div>
+        <h1>Book a Counseling Session</h1>
+        <p>Choose a counselor, pick a time that suits you and tell us briefly what you'd like to talk about. Sessions are free and confidential.</p>
+      </div>
+    </section>
+
+    <section class="section tight">
+      <div class="wrap layout-side">
+        <aside class="card sticky">
+          <h3>Counselors</h3>
+          <div class="counselor-list" id="counselors"></div>
+        </aside>
+
+        <div>
+          <div class="card">
+            <div class="card-head">
+              <h3 id="slot-title">Available times</h3>
+              <div class="pill-group" role="group" aria-label="Session mode" id="mode">
+                <button data-mode="" class="active">All</button>
+                <button data-mode="In-person">In-person</button>
+                <button data-mode="Online">Online</button>
+              </div>
+            </div>
+            <div class="date-strip" id="dates" role="listbox" aria-label="Choose a date"></div>
+            <div class="slot-grid" id="slots" aria-live="polite"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>Your upcoming sessions</h3><a class="link-arrow" href="dashboard.html">View all <span data-icon="arrow-right"></span></a></div>
+            <div id="mine"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/app.js"></script>
+  <script>
+    (async function () {
+      const { api, esc, icon } = CM;
+      const user = await CM.page({ page: 'book', roles: ['student'] });
+      if (!user) return;
+
+      const state = { counselorId: CM.qs('counselor') || '', date: '', mode: CM.qs('mode') || '' };
+      const counselors = api.counselors();
+
+      function renderCounselors() {
+        const opt = (id, img, name, sub) => '<button class="counselor-opt ' + (state.counselorId === id ? 'active' : '') + '" data-c="' + id + '">' + img + '<span><b>' + esc(name) + '</b><small>' + esc(sub) + '</small></span></button>';
+        document.getElementById('counselors').innerHTML =
+          opt('', '<span class="avatar">' + icon('users') + '</span>', 'Any counselor', 'Earliest available time') +
+          counselors.map(c => opt(c.id, CM.avatar(c), c.name, (c.specialties || []).join(' · ') || c.title)).join('');
+      }
+
+      function renderDates() {
+        const slots = api.openSlots({ counselorId: state.counselorId, mode: state.mode });
+        const counts = {};
+        slots.forEach(s => { counts[s.date] = (counts[s.date] || 0) + 1; });
+        const days = [];
+        for (let i = 0; i < 21; i++) days.push(CM.addDays(i));
+        if (!state.date || !counts[state.date]) state.date = days.find(d => counts[d]) || '';
+        document.getElementById('dates').innerHTML = days.map(d => {
+          const dt = CM.parseDate(d);
+          return '<button class="date-chip ' + (d === state.date ? 'active' : '') + '" data-d="' + d + '" role="option" aria-selected="' + (d === state.date) + '" ' + (counts[d] ? '' : 'disabled') + '><small>' + CM.DOW[dt.getDay()] + '</small><b>' + dt.getDate() + '</b><span class="cnt">' + (counts[d] ? counts[d] + ' open' : '—') + '</span></button>';
+        }).join('');
+        const active = document.querySelector('.date-chip.active');
+        if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+
+      function renderSlots() {
+        const box = document.getElementById('slots');
+        document.getElementById('slot-title').textContent = state.date ? 'Available on ' + CM.fmtDate(state.date) : 'Available times';
+        const slots = state.date ? api.openSlots({ counselorId: state.counselorId, mode: state.mode, date: state.date }) : [];
+        if (!slots.length) { box.innerHTML = '<div style="grid-column:1/-1">' + CM.emptyState('calendar', 'No open slots match your filters. Try another counselor or mode, or message a counselor directly.') + '</div>'; return; }
+        box.innerHTML = slots.map(s => {
+          const c = api.user(s.counselorId);
+          return '<button class="slot" data-s="' + s.id + '"><div class="t">' + s.start + ' – ' + s.end + '</div><div class="c">' + esc(c.name) + '</div>' +
+            '<span class="badge ' + (s.mode === 'Online' ? 'info' : '') + '">' + icon(s.mode === 'Online' ? 'video' : 'map') + ' ' + s.mode + '</span></button>';
+        }).join('');
+      }
+
+      function renderMine() {
+        const now = new Date();
+        const rows = api.bookingsFor(user).filter(b => b.status === 'confirmed' && CM.slotStart(b.slot) > now);
+        const box = document.getElementById('mine');
+        if (!rows.length) { box.innerHTML = CM.emptyState('calendar', 'You have no upcoming sessions yet.'); return; }
+        box.innerHTML = rows.map(b => {
+          const d = CM.parseDate(b.slot.date);
+          return '<div class="session-item"><div class="date-box"><small>' + CM.MON[d.getMonth()] + '</small><b>' + d.getDate() + '</b></div>' +
+            '<div class="info"><b>' + b.slot.start + ' – ' + b.slot.end + ' · ' + esc(api.displayName(b.counselorId)) + '</b><span>' + esc(b.slot.mode) + ' · ' + esc(b.reason) + '</span></div>' +
+            '<button class="btn btn-danger btn-sm" data-cancel="' + b.id + '">Cancel</button></div>';
+        }).join('');
+      }
+
+      function renderAll() { renderCounselors(); renderDates(); renderSlots(); renderMine(); }
+
+      function openBooking(slotId) {
+        const s = CM.db.find('slots', slotId);
+        const c = api.user(s.counselorId);
+        CM.modal({
+          title: 'Confirm your session',
+          body: '<div class="person" style="margin-bottom:16px">' + CM.avatar(c, 'lg') + '<div><b>' + esc(c.name) + '</b><div class="small muted">' + esc(c.title || '') + '</div>' +
+            '<div class="small">' + CM.fmtDate(s.date) + ' · ' + s.start + ' – ' + s.end + ' · ' + s.mode + '</div></div></div>' +
+            '<form novalidate><div class="field" data-field="reason"><label for="bk-r">What would you like to talk about?</label><textarea class="input" id="bk-r" name="reason" rows="4" maxlength="500" placeholder="A sentence or two is enough. Only your counselor will see this."></textarea><div class="err"></div></div>' +
+            '<p class="small muted">' + (s.mode === 'Online' ? 'A video link will be shared by your counselor before the session.' : 'Sessions take place at the Counseling Centre, Student Affairs Block.') + ' Please cancel at least 2 hours in advance if you can\'t make it.</p>' +
+            '<div class="form-actions"><button type="button" class="btn btn-outline" data-close>Back</button><button class="btn btn-primary">Confirm booking</button></div></form>',
+          onMount(m, close) {
+            CM.onSubmit(m.querySelector('form'), async form => {
+              try {
+                await api.bookSlot(user, slotId, form.reason.value);
+                close();
+                CM.toast('Session booked! You will find it in your dashboard.');
+                renderAll();
+              } catch (err) {
+                CM.showErrors(form, err);
+                if (!err.fields) renderAll();
+              }
+            });
+          }
+        });
+      }
+
+      document.getElementById('counselors').addEventListener('click', e => {
+        const b = e.target.closest('[data-c]'); if (!b) return;
+        state.counselorId = b.dataset.c; state.date = ''; renderAll();
+      });
+      document.getElementById('dates').addEventListener('click', e => {
+        const b = e.target.closest('[data-d]'); if (!b || b.disabled) return;
+        state.date = b.dataset.d; renderDates(); renderSlots();
+      });
+      document.getElementById('mode').addEventListener('click', e => {
+        const b = e.target.closest('[data-mode]'); if (!b) return;
+        state.mode = b.dataset.mode; state.date = '';
+        document.querySelectorAll('#mode button').forEach(x => x.classList.toggle('active', x === b));
+        renderDates(); renderSlots();
+      });
+      document.querySelectorAll('#mode button').forEach(x => x.classList.toggle('active', x.dataset.mode === state.mode));
+      document.getElementById('slots').addEventListener('click', e => {
+        const b = e.target.closest('[data-s]'); if (b) openBooking(b.dataset.s);
+      });
+      document.getElementById('mine').addEventListener('click', async e => {
+        const b = e.target.closest('[data-cancel]'); if (!b) return;
+        if (!(await CM.confirm('Cancel this session? The slot will be released for other students.', 'Cancel session', true))) return;
+        try { await api.cancelBooking(user, b.dataset.cancel); CM.toast('Session cancelled.'); renderAll(); }
+        catch (err) { CM.toast(err.message, 'error'); }
+      });
+
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
